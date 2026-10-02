@@ -1,0 +1,400 @@
+{
+  "name": "wt",
+  "displayName": "wt — git worktrees",
+  "description": "Switch, create, fork and remove git worktrees from the sidebar, powered by the wt CLI.",
+  "version": "0.1.0",
+  "publisher": "glevski",
+  "icon": "media/icon.png",
+  "private": true,
+  "homepage": "https://wt.glevski.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/glevski/wt-vscode.git"
+  },
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "SCM Providers",
+    "Other"
+  ],
+  "keywords": [
+    "git",
+    "worktree",
+    "worktrees",
+    "wt",
+    "cursor"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "icons": {
+      "wt-logo": {
+        "description": "wt",
+        "default": {
+          "fontPath": "media/wt.ttf",
+          "fontCharacter": "\\E001"
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "wt",
+          "title": "Worktrees",
+          "icon": "media/wt-mono.svg"
+        }
+      ]
+    },
+    "views": {
+      "wt": [
+        {
+          "id": "wt.worktrees",
+          "name": "Worktrees",
+          "icon": "media/wt-mono.svg",
+          "contextualTitle": "wt"
+        },
+        {
+          "id": "wt.snapshots",
+          "name": "Snapshots",
+          "icon": "media/wt-mono.svg",
+          "contextualTitle": "wt",
+          "when": "wt.state == ready"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "wt.worktrees",
+        "contents": "The wt CLI (the `worktree` binary) was not found.\n[Install wt](https://wt.glevski.com)\n[Set the Binary Path](command:wt.openSettings)",
+        "when": "wt.state == missing"
+      },
+      {
+        "view": "wt.worktrees",
+        "contents": "This version of wt is too old for the extension: it needs `wt list --json`.\n[Update wt](https://wt.glevski.com)",
+        "when": "wt.state == outdated"
+      },
+      {
+        "view": "wt.worktrees",
+        "contents": "The open folder is not inside a git repository.",
+        "when": "wt.state == norepo"
+      },
+      {
+        "view": "wt.worktrees",
+        "contents": "Open a folder to see its worktrees.",
+        "when": "wt.state == nofolder"
+      },
+      {
+        "view": "wt.worktrees",
+        "contents": "wt could not list the worktrees.\n[Show Log](command:wt.showLog)\n[Retry](command:wt.refresh)",
+        "when": "wt.state == error"
+      },
+      {
+        "view": "wt.snapshots",
+        "contents": "No snapshots in this worktree yet.\n[Snapshot Now](command:wt.snapshot)\nA snapshot saves your tracked and untracked changes privately: no commit, nothing on the branch, nothing pushed.",
+        "when": "wt.snapshots == empty"
+      },
+      {
+        "view": "wt.snapshots",
+        "contents": "Snapshots need a real worktree — this window is a read-only peek.",
+        "when": "wt.snapshots == peek"
+      },
+      {
+        "view": "wt.snapshots",
+        "contents": "This version of wt is too old to list snapshots here: it needs `wt snap ls --json`.\n[Update wt](https://wt.glevski.com)",
+        "when": "wt.snapshots == outdated"
+      },
+      {
+        "view": "wt.snapshots",
+        "contents": "wt could not list the snapshots.\n[Show Log](command:wt.showLog)\n[Retry](command:wt.refresh)",
+        "when": "wt.snapshots == error"
+      }
+    ],
+    "commands": [
+      {
+        "command": "wt.refresh",
+        "title": "Refresh",
+        "category": "wt",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "wt.switch",
+        "title": "Switch Worktree…",
+        "category": "wt"
+      },
+      {
+        "command": "wt.open",
+        "title": "Open",
+        "category": "wt",
+        "icon": "$(arrow-right)"
+      },
+      {
+        "command": "wt.openInNewWindow",
+        "title": "Open in New Window",
+        "category": "wt",
+        "icon": "$(empty-window)"
+      },
+      {
+        "command": "wt.create",
+        "title": "New Worktree…",
+        "category": "wt",
+        "icon": "$(add)"
+      },
+      {
+        "command": "wt.fork",
+        "title": "Fork Current Changes into a New Worktree…",
+        "category": "wt",
+        "icon": "$(repo-forked)"
+      },
+      {
+        "command": "wt.remove",
+        "title": "Remove Worktree…",
+        "category": "wt",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "wt.finish",
+        "title": "Finish This Worktree…",
+        "category": "wt",
+        "icon": "$(check)"
+      },
+      {
+        "command": "wt.home",
+        "title": "Go to Main Checkout",
+        "category": "wt"
+      },
+      {
+        "command": "wt.link",
+        "title": "Link Repository to a Project Name…",
+        "category": "wt"
+      },
+      {
+        "command": "wt.copyPath",
+        "title": "Copy Path",
+        "category": "wt"
+      },
+      {
+        "command": "wt.openTerminal",
+        "title": "Open in Terminal",
+        "category": "wt"
+      },
+      {
+        "command": "wt.snapshot",
+        "title": "Snapshot Now…",
+        "category": "wt",
+        "icon": "$(device-camera)"
+      },
+      {
+        "command": "wt.snapshotChanges",
+        "title": "Show Changes Since Last Snapshot",
+        "category": "wt",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "wt.snapshotOpenChanges",
+        "title": "Open Changes",
+        "category": "wt",
+        "icon": "$(diff-multiple)"
+      },
+      {
+        "command": "wt.snapshotCopySha",
+        "title": "Copy Commit SHA",
+        "category": "wt"
+      },
+      {
+        "command": "wt.showLog",
+        "title": "Show Log",
+        "category": "wt"
+      },
+      {
+        "command": "wt.openSettings",
+        "title": "Open Settings",
+        "category": "wt"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "wt.open",
+          "when": "false"
+        },
+        {
+          "command": "wt.copyPath",
+          "when": "false"
+        },
+        {
+          "command": "wt.openTerminal",
+          "when": "false"
+        },
+        {
+          "command": "wt.snapshotOpenChanges",
+          "when": "false"
+        },
+        {
+          "command": "wt.snapshotCopySha",
+          "when": "false"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "wt.snapshot",
+          "when": "view == wt.snapshots",
+          "group": "navigation@1"
+        },
+        {
+          "command": "wt.snapshotChanges",
+          "when": "view == wt.snapshots",
+          "group": "navigation@2"
+        },
+        {
+          "command": "wt.refresh",
+          "when": "view == wt.snapshots",
+          "group": "navigation@3"
+        },
+        {
+          "command": "wt.create",
+          "when": "view == wt.worktrees && wt.state == ready",
+          "group": "navigation@1"
+        },
+        {
+          "command": "wt.fork",
+          "when": "view == wt.worktrees && wt.state == ready",
+          "group": "navigation@2"
+        },
+        {
+          "command": "wt.refresh",
+          "when": "view == wt.worktrees",
+          "group": "navigation@3"
+        },
+        {
+          "command": "wt.home",
+          "when": "view == wt.worktrees && wt.state == ready",
+          "group": "1_wt@1"
+        },
+        {
+          "command": "wt.link",
+          "when": "view == wt.worktrees && wt.state == ready",
+          "group": "1_wt@2"
+        },
+        {
+          "command": "wt.showLog",
+          "when": "view == wt.worktrees",
+          "group": "2_log@1"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "wt.snapshotOpenChanges",
+          "when": "view == wt.snapshots && viewItem == wt.snapshot",
+          "group": "inline@1"
+        },
+        {
+          "command": "wt.snapshotOpenChanges",
+          "when": "view == wt.snapshots && viewItem == wt.snapshot",
+          "group": "1_open@1"
+        },
+        {
+          "command": "wt.snapshotCopySha",
+          "when": "view == wt.snapshots && viewItem == wt.snapshot",
+          "group": "2_copy@1"
+        },
+        {
+          "command": "wt.open",
+          "when": "view == wt.worktrees && viewItem =~ /^wt\\.(worktree|peek)\\.[a-z]+$/",
+          "group": "inline@1"
+        },
+        {
+          "command": "wt.openInNewWindow",
+          "when": "view == wt.worktrees && viewItem =~ /^wt\\.(worktree|peek)\\.[a-z]+$/",
+          "group": "inline@2"
+        },
+        {
+          "command": "wt.finish",
+          "when": "view == wt.worktrees && viewItem =~ /^wt\\.worktree\\.(managed|external)\\.current$/",
+          "group": "inline@1"
+        },
+        {
+          "command": "wt.open",
+          "when": "view == wt.worktrees && viewItem =~ /^wt\\.(worktree|peek)\\.[a-z]+$/",
+          "group": "1_open@1"
+        },
+        {
+          "command": "wt.openInNewWindow",
+          "when": "view == wt.worktrees && viewItem =~ /^wt\\.(worktree|peek)\\.[a-z]+$/",
+          "group": "1_open@2"
+        },
+        {
+          "command": "wt.openTerminal",
+          "when": "view == wt.worktrees && viewItem =~ /^wt\\./",
+          "group": "2_path@1"
+        },
+        {
+          "command": "wt.copyPath",
+          "when": "view == wt.worktrees && viewItem =~ /^wt\\./",
+          "group": "2_path@2"
+        },
+        {
+          "command": "wt.finish",
+          "when": "view == wt.worktrees && viewItem =~ /^wt\\.worktree\\.(managed|external)\\.current$/",
+          "group": "3_remove@1"
+        },
+        {
+          "command": "wt.remove",
+          "when": "view == wt.worktrees && viewItem =~ /^wt\\.worktree\\.(managed|external)$/",
+          "group": "3_remove@2"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "wt",
+      "properties": {
+        "wt.path": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "markdownDescription": "Path to the `worktree` binary. Leave empty to find it on `PATH`, then in `~/.local/bin`, `/opt/homebrew/bin` and `/usr/local/bin`."
+        },
+        "wt.openIn": {
+          "type": "string",
+          "enum": [
+            "currentWindow",
+            "newWindow"
+          ],
+          "enumDescriptions": [
+            "Replace the folder in this window, like `wt ch` moves your shell.",
+            "Open a new window and keep this one where it is."
+          ],
+          "default": "currentWindow",
+          "description": "Where a worktree opens after New Worktree, Fork, and Switch Worktree."
+        },
+        "wt.statusBar.showProject": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show the project name in the status bar: `project · worktree`. Turn off to show the worktree name alone."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "icons": "node scripts/icon-font.mjs",
+    "test": "tsc --noEmit && node esbuild.mjs --test && node --test \"out/test/*.test.js\"",
+    "package": "npm run build && vsce package --no-dependencies --skip-license",
+    "vscode:prepublish": "node esbuild.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "~1.96.0",
+    "@vscode/vsce": "^4.0.0",
+    "esbuild": "^0.28.0",
+    "svg2ttf": "^6.1.0",
+    "typescript": "^7.0.0"
+  }
+}
