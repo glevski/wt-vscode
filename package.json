@@ -1,8 +1,8 @@
 {
   "name": "wt",
-  "displayName": "wt — git worktrees",
+  "displayName": "wt - git worktrees",
   "description": "Switch, create, fork and remove git worktrees from the sidebar, powered by the wt CLI.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "glevski",
   "icon": "media/icon.png",
   "private": true,
@@ -387,7 +387,7 @@
     "typecheck": "tsc --noEmit",
     "icons": "node scripts/icon-font.mjs",
     "test": "tsc --noEmit && node esbuild.mjs --test && node --test \"out/test/*.test.js\"",
-    "package": "npm run build && vsce package --no-dependencies",
+    "package": "npm run build && mkdir -p builds && vsce package --no-dependencies --out builds/",
     "vscode:prepublish": "node esbuild.mjs"
   },
   "devDependencies": {

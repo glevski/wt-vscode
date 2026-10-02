@@ -1,4 +1,4 @@
-# wt — git worktrees
+# wt - git worktrees
 
 [wt](https://wt.glevski.com) in the sidebar of Cursor and VS Code: see every
 worktree of the repository you have open, jump between them, and create, fork
@@ -83,7 +83,7 @@ window: the first workspace folder.
 ```sh
 npm install
 npm test          # typecheck + unit tests
-npm run package   # builds wt-<version>.vsix
+npm run package   # builds builds/wt-<version>.vsix (the folder is git-ignored)
 ```
 
 `WT_TEST_BINARY=/path/to/worktree npm test` also runs the tests that drive a

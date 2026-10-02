@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- MIT licence, included in the package.
+- The title is "wt - git worktrees", with a plain hyphen.
+
 ## 0.1.0
 
 First version.
