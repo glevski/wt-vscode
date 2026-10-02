@@ -6,6 +6,7 @@
   "publisher": "glevski",
   "icon": "media/icon.png",
   "private": true,
+  "license": "MIT",
   "homepage": "https://wt.glevski.com",
   "repository": {
     "type": "git",
@@ -386,7 +387,7 @@
     "typecheck": "tsc --noEmit",
     "icons": "node scripts/icon-font.mjs",
     "test": "tsc --noEmit && node esbuild.mjs --test && node --test \"out/test/*.test.js\"",
-    "package": "npm run build && vsce package --no-dependencies --skip-license",
+    "package": "npm run build && vsce package --no-dependencies",
     "vscode:prepublish": "node esbuild.mjs"
   },
   "devDependencies": {
