@@ -36,6 +36,25 @@ age of its last commit, the branch when the directory name does not already
 say it, and at the end `checkout 3d` for when you last jumped into it. Hover
 a row for its path, branch, base, changed-file count and deps state.
 
+A worktree with uncommitted changes unfolds into its changed files, like the
+Changes group of the Source Control view: file icon, folder, and the status
+letter (`M`, `A`, `D`, `U`, `R`) at the right. Click a file for its diff
+against the last commit; the button on the row opens the file itself. The
+**Open Changes** button on the worktree row opens all of its changed files in
+one diff editor, for reviewing them in one go.
+
+Below the changed files comes **On top of `<branch>`**: the commits the
+worktree has that its parent branch does not, newest first. Click a commit to
+see what it changed. The parent is one of your base branches (`wt base`): the
+one wt recorded when it created the worktree, or, for worktrees made by other
+tools or forked off another feature branch, the nearest one, which the row's
+hover says. A repository without base worktrees compares with the main
+checkout's branch. A worktree with nothing to show has no arrow.
+
+All of this works for every worktree, not only the one the window has open.
+Files of other worktrees are shown as read-only copies, so looking at them
+does not make the Git extension ask to open that worktree's repository.
+
 **Snapshots section** below the list, titled with the worktree it shows —
 `Snapshots (dev-3)`: the `wt snap` records of the worktree this window has
 open, newest first. Unfold a snapshot to see the files it

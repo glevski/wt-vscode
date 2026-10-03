@@ -149,9 +149,16 @@ function exec(file: string, args: string[], cwd: string, env: NodeJS.ProcessEnv)
   });
 }
 
-/** Runs any program and returns its stdout; rejects on a non-zero exit. */
+/**
+ * What every read-only call runs under: git may refresh the index as a side
+ * effect of `status` or `diff`, and a view that re-reads whenever the index
+ * changes must not be the one changing it.
+ */
+const readOnly = { GIT_OPTIONAL_LOCKS: "0" };
+
+/** Runs a read-only program (git, in practice) and returns its stdout; rejects on a non-zero exit. */
 export async function execText(file: string, args: string[], cwd: string): Promise<string> {
-  const result = await exec(file, args, cwd, process.env);
+  const result = await exec(file, args, cwd, { ...process.env, ...readOnly });
   if (result.code !== 0) {
     throw new Error(result.stderr.trim() || result.spawnError?.message || `${file} failed`);
   }
@@ -206,7 +213,7 @@ export class Cli {
   async snapshots(cwd: string): Promise<SnapshotDoc> {
     let stdout: string;
     try {
-      stdout = await this.run(["snap", "ls", "--all", "--json"], cwd);
+      stdout = await this.run(["snap", "ls", "--all", "--json"], cwd, readOnly);
     } catch (err) {
       // a binary from before --json answers with its usage line
       if (err instanceof WtError && err.kind === "failed" && err.message.startsWith("usage: wt snap ls")) {
@@ -225,7 +232,7 @@ export class Cli {
   async list(cwd: string): Promise<ListDoc> {
     let stdout: string;
     try {
-      stdout = await this.run(["list", "--json"], cwd);
+      stdout = await this.run(["list", "--json"], cwd, readOnly);
     } catch (err) {
       // a binary from before --json answers with its usage line
       if (err instanceof WtError && err.kind === "failed" && err.message.startsWith("usage: wt list")) {

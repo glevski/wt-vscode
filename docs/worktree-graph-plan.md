@@ -1,6 +1,13 @@
 # Plan: a worktree's history relative to its parent
 
-Status: **postponed** (drafted 2026-10-02). Nothing below is built.
+Status: **postponed** (drafted 2026-10-02). The phases below are not built.
+
+Built since, in 0.1.2, as a smaller cut of the same idea: each worktree row
+unfolds into the commits it has on top of its parent branch (`src/history.ts`).
+That version resolves the parent inside the extension — the recorded base when
+it is a base branch, else the nearest base branch — and shows only the
+worktree's side. No `wt commits` command, no behind count, no fork point, no
+manual "Compare with…".
 
 ## Goal
 

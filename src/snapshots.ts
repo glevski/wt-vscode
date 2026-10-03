@@ -16,6 +16,7 @@ import {
   shortSha,
   statusWord,
 } from "./model";
+import { revisionUri } from "./revision";
 import { Store, currentWorktree, toUri } from "./store";
 import { ready, registerCommand } from "./ui";
 
@@ -100,33 +101,6 @@ export class SnapshotStore implements vscode.Disposable {
   dispose(): void {
     this.subscription.dispose();
     this.changed.dispose();
-  }
-}
-
-// ---- file contents at a revision ----
-
-const scheme = "wt-snap";
-
-/**
- * A file as it was at a git revision. Snapshots are ordinary commit objects,
- * so `git show <sha>:<path>` reads them. An empty ref is an empty document:
- * the missing side of an added or deleted file.
- */
-function revisionUri(worktree: string, ref: string, file: string): vscode.Uri {
-  return vscode.Uri.from({ scheme, path: `/${file}`, query: JSON.stringify({ worktree, ref }) });
-}
-
-class RevisionContent implements vscode.TextDocumentContentProvider {
-  async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
-    const { worktree, ref } = JSON.parse(uri.query) as { worktree: string; ref: string };
-    if (ref === "") {
-      return "";
-    }
-    try {
-      return await execText("git", ["show", `${ref}:${uri.path.slice(1)}`], worktree);
-    } catch {
-      return "";
-    }
   }
 }
 
@@ -260,7 +234,6 @@ export function registerSnapshots(
     snapshots,
     tree,
     view,
-    vscode.workspace.registerTextDocumentContentProvider(scheme, new RevisionContent()),
     view.onDidChangeVisibility((event) => snapshots.setVisible(event.visible)),
     // snapshots belong to one worktree; the header says which one is listed
     store.onDidChange(() => {

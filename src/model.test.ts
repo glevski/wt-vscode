@@ -4,19 +4,27 @@ import {
   Snapshot,
   Worktree,
   age,
+  baseBranches,
   branchChoices,
   branchInName,
+  changeLook,
   changeSummary,
+  countText,
+  describeCommit,
   describeSnapshot,
   describeWorktree,
+  hasParent,
   isRemovable,
   isSyncing,
   lineSummary,
+  parseCommits,
   parseJump,
   parseList,
   parseNameStatus,
   parseSnapshots,
+  parseStatus,
   peekContext,
+  pickParent,
   statusText,
   statusWord,
   worktreeContext,
@@ -118,15 +126,26 @@ test("branchInName spots a branch the directory name already tells", () => {
 });
 
 test("context values match the menu clauses in package.json", () => {
-  const openable = /^wt\.(worktree|peek)\.[a-z]+$/;
-  const removable = /^wt\.worktree\.(managed|external)$/;
-  const finishable = /^wt\.worktree\.(managed|external)\.current$/;
+  const openable = /^wt\.(worktree|peek)\.[a-z]+(\.dirty)?$/;
+  const removable = /^wt\.worktree\.(managed|external)(\.dirty)?$/;
+  const finishable = /^wt\.worktree\.(managed|external)\.current(\.dirty)?$/;
+  const reviewable = /\.dirty$/;
 
   const other = worktreeContext(worktree());
-  assert.ok(openable.test(other) && removable.test(other) && !finishable.test(other));
+  assert.ok(openable.test(other) && removable.test(other) && !finishable.test(other) && !reviewable.test(other));
 
   const here = worktreeContext(worktree({ current: true }));
   assert.ok(!openable.test(here) && !removable.test(here) && finishable.test(here));
+
+  // uncommitted changes add Open Changes and take nothing away
+  const otherDirty = worktreeContext(worktree({ state: "dirty" }));
+  assert.equal(otherDirty, "wt.worktree.managed.dirty");
+  assert.ok(openable.test(otherDirty) && removable.test(otherDirty) && !finishable.test(otherDirty) && reviewable.test(otherDirty));
+  const hereDirty = worktreeContext(worktree({ current: true, state: "dirty" }));
+  assert.equal(hereDirty, "wt.worktree.managed.current.dirty");
+  assert.ok(!openable.test(hereDirty) && !removable.test(hereDirty) && finishable.test(hereDirty) && reviewable.test(hereDirty));
+  assert.ok(openable.test(worktreeContext(worktree({ kind: "main", state: "dirty" }))));
+  assert.ok(!reviewable.test(peekContext(false)) && !reviewable.test(peekContext(true)));
 
   for (const kind of ["main", "base"] as const) {
     const context = worktreeContext(worktree({ kind }));
@@ -219,6 +238,102 @@ test("parseNameStatus splits git's NUL-separated pairs", () => {
   assert.equal(statusWord("A"), "added");
   assert.equal(statusWord("M"), "");
   assert.equal(statusWord("X"), "X");
+});
+
+test("parseStatus gives each changed path the letter Source Control shows", () => {
+  const out = [
+    " M scripts/crawl-categories.ts",
+    "M  scripts/build-info-categories.ts",
+    "MM scripts/blob-migrate-images.ts",
+    "A  src/staged new.ts",
+    "AM src/added-then-edited.ts",
+    " D gone.txt",
+    "D  staged-gone.txt",
+    "R  renamed-to.ts",
+    "renamed-from.ts",
+    "UU both-edited.ts",
+    "?? notes.txt",
+    "?? dir/untracked.txt",
+    "",
+  ].join("\0");
+  assert.deepEqual(parseStatus(out), [
+    { status: "!", path: "both-edited.ts" },
+    { status: "U", path: "dir/untracked.txt" },
+    { status: "D", path: "gone.txt" },
+    { status: "U", path: "notes.txt" },
+    { status: "R", path: "renamed-to.ts" },
+    { status: "M", path: "scripts/blob-migrate-images.ts" },
+    { status: "M", path: "scripts/build-info-categories.ts" },
+    { status: "M", path: "scripts/crawl-categories.ts" },
+    { status: "A", path: "src/added-then-edited.ts" },
+    { status: "A", path: "src/staged new.ts" },
+    { status: "D", path: "staged-gone.txt" },
+  ]);
+  assert.deepEqual(parseStatus(""), []);
+});
+
+test("baseBranches are what the base worktrees are pinned to, or the main checkout's branch", () => {
+  const doc = (worktrees: Worktree[]) => ({ schema: 1, project: "p", linked: true, root: "/r", worktrees, peeks: [] });
+  const main = worktree({ kind: "main", name: "repo", branch: "feat/x", head: "m".repeat(40) });
+  const dev = worktree({ kind: "base", name: "dev", branch: "dev", pinned: "dev", head: "d".repeat(40) });
+  const staging = worktree({ kind: "base", name: "staging", branch: "other", pinned: "staging", drifted: true, head: "s".repeat(40) });
+
+  // a drifted base is not on its branch, so its head says nothing about it
+  assert.deepEqual(baseBranches(doc([main, dev, staging, worktree()])), [{ branch: "dev", sha: "d".repeat(40) }]);
+  assert.deepEqual(baseBranches(doc([main, worktree()])), [{ branch: "feat/x", sha: "m".repeat(40) }]);
+  assert.deepEqual(baseBranches(doc([worktree()])), []);
+
+  assert.equal(hasParent(worktree()), true);
+  assert.equal(hasParent(worktree({ kind: "external" })), true);
+  assert.equal(hasParent(main), false);
+  assert.equal(hasParent(dev), false);
+});
+
+test("pickParent prefers the recorded base branch, else the nearest one", () => {
+  const candidates = [
+    { branch: "staging", sha: "s", ahead: 9 },
+    { branch: "main", sha: "m", ahead: 12 },
+    { branch: "dev", sha: "d", ahead: 1 },
+  ];
+  // recorded and a base branch: taken even though another is nearer
+  assert.deepEqual(pickParent(worktree({ base: "main" }), candidates), { branch: "main", sha: "m", ahead: 12, recorded: true });
+  // recorded, but a feature branch: the nearest base branch instead
+  assert.deepEqual(pickParent(worktree({ base: "claude/other-feature" }), candidates), {
+    branch: "dev",
+    sha: "d",
+    ahead: 1,
+    recorded: false,
+  });
+  // nothing recorded (made by another tool): the nearest
+  assert.equal(pickParent(worktree({ kind: "external" }), candidates)?.branch, "dev");
+  // never its own branch
+  assert.equal(pickParent(worktree({ branch: "dev", base: "dev" }), candidates)?.branch, "staging");
+  // a tie goes to the first listed
+  assert.equal(pickParent(worktree(), [{ branch: "a", sha: "1", ahead: 0 }, { branch: "b", sha: "2", ahead: 0 }])?.branch, "a");
+  assert.equal(pickParent(worktree(), []), undefined);
+});
+
+test("parseCommits reads the unit-separated log lines", () => {
+  const out =
+    "7539c4803a30ba16d8435fdd8b7fad1e91c0ca30\x1ffix(theme): keep the dark palette\x1fKirill G\x1f2026-09-05T10:00:00+02:00\n" +
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\x1f\x1fSomeone\x1f2026-09-01T10:00:00Z\n";
+  assert.deepEqual(parseCommits(out), [
+    { sha: "7539c4803a30ba16d8435fdd8b7fad1e91c0ca30", subject: "fix(theme): keep the dark palette", author: "Kirill G", date: "2026-09-05T10:00:00+02:00" },
+    { sha: "a".repeat(40), subject: "", author: "Someone", date: "2026-09-01T10:00:00Z" },
+  ]);
+  assert.deepEqual(parseCommits(""), []);
+  const now = new Date("2026-10-03T08:00:00Z");
+  assert.equal(describeCommit(parseCommits(out)[0], now), "7539c48 · 28d");
+  assert.equal(countText(1, "commit"), "1 commit");
+  assert.equal(countText(3, "commit"), "3 commits");
+});
+
+test("changeLook maps letters to the git extension's colors", () => {
+  assert.deepEqual(changeLook("M"), { color: "gitDecoration.modifiedResourceForeground", title: "Modified" });
+  assert.equal(changeLook("U").title, "Untracked");
+  assert.equal(changeLook("!").color, "gitDecoration.conflictingResourceForeground");
+  // an unknown letter still gets a look
+  assert.equal(changeLook("T").title, "Modified");
 });
 
 test("branchChoices lists local branches, then remote-only ones by their bare name", () => {

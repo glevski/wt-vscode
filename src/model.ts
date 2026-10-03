@@ -159,11 +159,11 @@ export function describePeek(p: Peek): string {
 
 /**
  * The tree item's contextValue, matched by the menu `when` clauses in
- * package.json: wt.worktree.<kind>, with a .current suffix for the worktree
- * this window has open.
+ * package.json: wt.worktree.<kind>, then .current for the worktree this
+ * window has open, then .dirty when it has uncommitted changes.
  */
 export function worktreeContext(w: Worktree): string {
-  return `wt.worktree.${w.kind}${w.current ? ".current" : ""}`;
+  return `wt.worktree.${w.kind}${w.current ? ".current" : ""}${w.state === "dirty" ? ".dirty" : ""}`;
 }
 
 export function peekContext(current: boolean): string {
@@ -299,6 +299,157 @@ export function parseNameStatus(out: string): FileChange[] {
     }
   }
   return changes;
+}
+
+/**
+ * Parses `git status --porcelain=v1 -z --untracked-files=all` into one entry
+ * per changed path, sorted by path, each with the single letter the Source
+ * Control view shows for it: U untracked, A added, D deleted, R renamed,
+ * C copied, ! in conflict, M for everything else.
+ */
+export function parseStatus(out: string): FileChange[] {
+  const fields = out.split("\0");
+  const changes: FileChange[] = [];
+  for (let i = 0; i < fields.length; i++) {
+    const entry = fields[i];
+    if (entry.length < 4) {
+      continue;
+    }
+    const x = entry[0];
+    const y = entry[1];
+    if (x === "R" || x === "C" || y === "R" || y === "C") {
+      i++; // the path it was renamed or copied from follows as its own field
+    }
+    changes.push({ status: statusLetter(x, y), path: entry.slice(3) });
+  }
+  return changes.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+}
+
+function statusLetter(x: string, y: string): string {
+  const pair = x + y;
+  if (pair === "??") {
+    return "U";
+  }
+  if (x === "U" || y === "U" || pair === "AA" || pair === "DD") {
+    return "!";
+  }
+  if (x === "D" || y === "D") {
+    return "D";
+  }
+  if (x === "A" || y === "A") {
+    return "A";
+  }
+  if (x === "R" || y === "R") {
+    return "R";
+  }
+  if (x === "C" || y === "C") {
+    return "C";
+  }
+  return "M";
+}
+
+// ---- a worktree's commits on top of the branch it grew from ----
+
+/** A long-lived branch worktrees are forked off, and where it stands. */
+export interface BaseBranch {
+  branch: string;
+  sha: string;
+}
+
+/**
+ * The branches a worktree's own commits are measured against: the ones the
+ * base worktrees are pinned to. A repository without base worktrees has its
+ * main checkout's branch in that role.
+ */
+export function baseBranches(doc: ListDoc): BaseBranch[] {
+  const bases = doc.worktrees
+    .filter((w) => w.kind === "base" && !w.drifted && w.pinned !== undefined && w.head !== "")
+    .map((w) => ({ branch: w.pinned as string, sha: w.head }));
+  if (bases.length > 0) {
+    return bases;
+  }
+  const main = doc.worktrees.find((w) => w.kind === "main");
+  return main !== undefined && main.branch !== "" && main.head !== "" ? [{ branch: main.branch, sha: main.head }] : [];
+}
+
+/** Only regular worktrees have a parent to compare with; the main checkout and bases are the parents. */
+export function hasParent(w: Worktree): boolean {
+  return (w.kind === "managed" || w.kind === "external") && w.head !== "";
+}
+
+/** The base branch a worktree is compared with, and how many commits it has on top of it. */
+export interface Parent extends BaseBranch {
+  ahead: number;
+  /** wt recorded this branch as the one the worktree was created from. */
+  recorded: boolean;
+}
+
+/**
+ * Picks a worktree's parent among the base branches, given how far ahead of
+ * each it is. The branch wt recorded at creation wins when it is a base
+ * branch. Otherwise — a worktree made by another tool, or forked off another
+ * feature branch — it is the nearest one: the base branch it has the fewest
+ * commits on top of. Never the worktree's own branch.
+ */
+export function pickParent(w: Worktree, candidates: (BaseBranch & { ahead: number })[]): Parent | undefined {
+  const others = candidates.filter((c) => c.branch !== w.branch);
+  const recorded = others.find((c) => c.branch === w.base);
+  if (recorded !== undefined) {
+    return { ...recorded, recorded: true };
+  }
+  let nearest: (BaseBranch & { ahead: number }) | undefined;
+  for (const candidate of others) {
+    if (nearest === undefined || candidate.ahead < nearest.ahead) {
+      nearest = candidate;
+    }
+  }
+  return nearest !== undefined ? { ...nearest, recorded: false } : undefined;
+}
+
+export interface Commit {
+  sha: string;
+  subject: string;
+  author: string;
+  /** Committer date. */
+  date: string;
+}
+
+/** The `git log` format parseCommits reads: fields split by the unit separator, one commit per line. */
+export const commitFormat = "--format=%H%x1f%s%x1f%an%x1f%cI";
+
+export function parseCommits(out: string): Commit[] {
+  const commits: Commit[] = [];
+  for (const line of out.split("\n")) {
+    const [sha, subject, author, date] = line.split("\x1f");
+    if (sha !== undefined && sha !== "" && date !== undefined) {
+      commits.push({ sha, subject, author, date });
+    }
+  }
+  return commits;
+}
+
+/** What a commit row says next to its subject. */
+export function describeCommit(c: Commit, now: Date = new Date()): string {
+  const when = age(c.date, now);
+  return when !== undefined ? `${shortSha(c.sha)} · ${when}` : shortSha(c.sha);
+}
+
+export function countText(n: number, noun: string): string {
+  return `${n} ${noun}${n === 1 ? "" : "s"}`;
+}
+
+/** How a change's letter is shown: the git extension's own theme color, and what it stands for. */
+export function changeLook(status: string): { color: string; title: string } {
+  const looks: Record<string, { color: string; title: string }> = {
+    M: { color: "gitDecoration.modifiedResourceForeground", title: "Modified" },
+    A: { color: "gitDecoration.addedResourceForeground", title: "Added" },
+    U: { color: "gitDecoration.untrackedResourceForeground", title: "Untracked" },
+    D: { color: "gitDecoration.deletedResourceForeground", title: "Deleted" },
+    R: { color: "gitDecoration.renamedResourceForeground", title: "Renamed" },
+    C: { color: "gitDecoration.addedResourceForeground", title: "Copied" },
+    "!": { color: "gitDecoration.conflictingResourceForeground", title: "Conflict" },
+  };
+  return looks[status] ?? looks.M;
 }
 
 export function statusWord(status: string): string {
